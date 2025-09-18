@@ -1,4 +1,6 @@
 -- made ts shi cuz im lwkey dont want to use profile store or profile service type shi, im prob using it for every game i make since its de cool
+local DEBUG = true
+local started = false
 
 local DataStoreService = game:GetService("DataStoreService")
 local RunService = game:GetService("RunService")
@@ -34,10 +36,10 @@ local function Copy(tbl) -- to copy a table since apparently, attributing a tabl
 end
 
 
-local function Check(player: Player) -- the obvious
+local function Check(player, isg) -- the obvious
 	if not RunService:IsServer() then error(script.Name.. " Can't fire a function called from a local script, " ..debug.traceback()) end
-	if player == nil then return end
-	if not PlayerCache[player.UserId] then warn(script.Name.. " Is not in the cache, please initialize the script, " ..debug.traceback()) end
+	if player and not PlayerCache[player.UserId] then error(script.Name.. " Is not in the cache, please initialize the script, " ..debug.traceback()) end
+	if not isg and started == false then error(script.Name.. " Havn't got initialized in the server, try to use Infostore:GlobalInit in a server script") end
 end
 
 local function DeleteTempData(player: Player)
@@ -46,19 +48,23 @@ end
 
 
 function InfoStore:GlobalInit(profileName: string, values: {}) -- Run it once on server
-	Check()
-	if DATA_PROFILE ~= nil then warn("Datastores have been already initialized for server, traceback: " ..debug.traceback()) end
+	Check(nil, true)
+	if started then warn("Datastores have been already initialized for server, traceback: " ..debug.traceback()) end
+	started = true
 	DATA_PROFILE = profileName
 	DataStore = DataStoreService:GetDataStore(DATA_PROFILE)
 	DefaultValues = values
+	if DEBUG then warn(DATA_PROFILE, DefaultValues) end
 	PlayerService.PlayerRemoving:Connect(function(plr) -- Don't need to save the data manually dw <3
 		InfoStore:SaveDataStore(plr)
 		DeleteTempData(plr)
+		if DEBUG then warn("Data saved and deleted temp data") end
 	end)
 end
 
 function InfoStore:PlayerInit(player: Player) -- Still need to load the data manually tho (run it for every player that joins)
 	Check()
+	if DEBUG then warn("player" ..player.Name.. "initiated") end
 	local key = DATA_PROFILE.. "_" ..player.UserId
 	local success, data = pcall(function()
 		return DataStore:GetAsync(key)
@@ -66,9 +72,11 @@ function InfoStore:PlayerInit(player: Player) -- Still need to load the data man
 	if not success then player:Kick("Failed to load data, please rejoin.") InfoStore:DeleteTempData(player) return end
 	if data then
 		PlayerCache[player.UserId] = data
+		print(data)
 	else
 		PlayerCache[player.UserId] = Copy(DefaultValues)
 	end
+	if DEBUG then warn(player.Name .."'s Data: " ..PlayerCache[player.UserId]) end
 end
 
 function InfoStore:SetValue(player: Player, valueName, value) -- to modify a value type shi
@@ -85,6 +93,7 @@ function InfoStore:GetValue(player: Player, Value) -- the obvious x2
 	local data = PlayerCache[player.UserId]
 	local tbl, key = resolvePath(data, Value)
 	if tbl and key then
+		if DEBUG then print(tbl, tbl[key]) end
 		return tbl[key]
 	end
 end
@@ -94,6 +103,7 @@ function InfoStore:SaveDataStore(player: Player) -- the obvious x3
 	local key = DATA_PROFILE.. "_" ..player.UserId
 	local success, err = pcall(function()
 		DataStore:SetAsync(key, PlayerCache[player.UserId])
+		if DEBUG then warn("Player data saved") end
 	end)
 	if not success then warn("Data of " ..player.Name.. " Have not been saved due to an error!") return end
 end
