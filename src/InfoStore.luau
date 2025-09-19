@@ -206,7 +206,11 @@ end
 
 function InfoStore:GetLastJoinedOfflinePlayer(userId: number) -- This function is to get the last joined time of an offline player
 	local success, data = pcall(function()
-		return LogStore:GetAsync(userId)
+		if LogStore:GetAsync(userId) == nil then
+			return LogCache[userId]
+		else
+			return LogStore:GetAsync(userId)
+		end
 	end)
 	if success then
 		if DEBUG then
